@@ -5,178 +5,6 @@ import (
 	"testing"
 )
 
-func TestTokenizer(t *testing.T) {
-	data := `
-	true`
-	expected := []any{true}
-	p := newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = `
-	false`
-	expected = []any{false}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = ` "Hello world!"	`
-	expected = []any{"\"", "Hello world!", "\""}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	// with escape char
-	data = ` "Hello \" world!"	`
-	expected = []any{"\"", `Hello \" world!`, "\""}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = `	42 `
-	expected = []any{float64(42)}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = `	-42 `
-	expected = []any{float64(-42)}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = `	42.123 `
-	expected = []any{float64(42.123)}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = `null`
-	expected = []any{nil}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = ` [116, 943, 234, 38793]`
-	expected = []any{"[", float64(116), ",",
-		float64(943), ",", float64(234), ",",
-		float64(38793), "]"}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("array Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = ` [116, true, "test", null]`
-	expected = []any{"[", float64(116), ",",
-		true, ",",
-		"\"", "test", "\"", ",",
-		nil, "]"}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("array Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = ` [116, [117, [118]]]`
-	expected = []any{"[", float64(116), ",",
-		"[", float64(117), ",",
-		"[", float64(118),
-		"]", "]", "]"}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("array Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	data = `
-	{
-		"keya": 123,
-		"keyb": 234
-	}`
-	expected = []any{"[", float64(116), ",",
-		true, ",",
-		"\"", "test", "\"", ",",
-		nil, "]"}
-	p = newTokenizer([]byte(data))
-	if err := p.parseTokens(); err != nil {
-		t.Fatalf("tokenizer err %v", err)
-	}
-	if !reflect.DeepEqual(p.tokens, expected) {
-		t.Fatalf("array Unmarshal result %v, expected: %v", p.tokens, expected)
-	}
-
-	// 	data = `{
-	// 		"Image": {
-	// 				"Width":  800,
-	// 				"Height": 600,
-	// 				"Title":  "View from 15th Floor",
-	// 				"Thumbnail": {
-	// 						"Url":    "http://www.example.com/image/481989943",
-	// 						"Height": 125,
-	// 						"Width":  100
-	// 				},
-	// 				"Animated" : false,
-	// 				"IDs": [116, 943, 234, 38793],
-	// 				"Comment": nil
-	// 			}
-	// 	}
-	// `
-	// 	expected = []any{`"Image"`, ":", "{", `"Witdh"`, float64(800), ",", `"Height"`, float64(600),
-	// 		",", `"Title"`, ":", `"View from 15th Floor"`, ",",
-	// 		`"Thumbnail"`, ":", "{", `"Url"`, ":", `"http://www.example.com/image/481989943"`,
-	// 		",", `"Height"`, ":", float64(125), ",", `"Width"`, float64(100), `"Animated"`, ":", "false", ",",
-	// 		`"IDs"`, ":", "[", float64(116), float64(943), float64(234), float64(38793), "]", ",",
-	// 		`"Comment"`, ":", "nil",
-	// 	}
-	// 	p = newTokenizer([]byte(data))
-	// 	if err := p.parseTokens(); err != nil {
-	// 		t.Fatalf("tokenizer err %v", err)
-	// 	}
-
-	// 	if reflect.DeepEqual(p.tokens, expected) {
-	// 		t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	// 	}
-}
-
 func TestParser(t *testing.T) {
 	data := `
 	true`
@@ -188,145 +16,176 @@ func TestParser(t *testing.T) {
 	if !reflect.DeepEqual(result, expected) {
 		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
 	}
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
-	// p := newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
 
-	// data = `
-	// false`
-	// expected = []any{false}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = `
+	false`
+	expected = false
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("bool err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = ` "Hello world!"	`
-	// expected = []any{"\"", "Hello world!", "\""}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = ` "Hello world!"	`
+	expected = "Hello world!"
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("str err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// // with escape char
-	// data = ` "Hello \" world!"	`
-	// expected = []any{"\"", `Hello \" world!`, "\""}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	// with escape char
+	data = ` "Hello \" world!"	`
+	expected = `Hello \" world!`
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("str err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = `	42 `
-	// expected = []any{float64(42)}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = `	42 `
+	expected = float64(42)
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("num err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = `	-42 `
-	// expected = []any{float64(-42)}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = `	-42 `
+	expected = float64(-42)
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("num err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = `	42.123 `
-	// expected = []any{float64(42.123)}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = `	42.123 `
+	expected = float64(42.123)
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("num err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = `null`
-	// expected = []any{nil}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("str Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = `null`
+	expected = nil
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("nil err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = ` [116, 943, 234, 38793]`
-	// expected = []any{"[", float64(116), ",",
-	// 	float64(943), ",", float64(234), ",",
-	// 	float64(38793), "]"}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("array Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = ` [116, 943, 234, 38793]`
+	expected = []any{float64(116), float64(943), float64(234), float64(38793)}
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("array err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = ` [116, true, "test", null]`
-	// expected = []any{"[", float64(116), ",",
-	// 	true, ",",
-	// 	"\"", "test", "\"", ",",
-	// 	nil, "]"}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("array Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = ` [116, true, "test", null]`
+	expected = []any{float64(116), true, "test", nil}
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("array err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = ` [116, [117, [118]]]`
-	// expected = []any{"[", float64(116), ",",
-	// 	"[", float64(117), ",",
-	// 	"[", float64(118),
-	// 	"]", "]", "]"}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("array Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = ` [116, [117, [118]]]`
+	expected = []any{float64(116), []any{float64(117), []any{float64(118)}}}
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("array err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 
-	// data = `
-	// {
-	// 	"keya": 123,
-	// 	"keyb": 234
-	// }`
-	// expected = []any{"[", float64(116), ",",
-	// 	true, ",",
-	// 	"\"", "test", "\"", ",",
-	// 	nil, "]"}
-	// p = newTokenizer([]byte(data))
-	// if err := p.parseTokens(); err != nil {
-	// 	t.Fatalf("tokenizer err %v", err)
-	// }
-	// if !reflect.DeepEqual(p.tokens, expected) {
-	// 	t.Fatalf("array Unmarshal result %v, expected: %v", p.tokens, expected)
-	// }
+	data = `
+	[
+   {
+      "keya":123,
+      "keyb":234
+   },
+   {
+      "keya":123,
+      "keyb":234
+   }
+]
+`
+	expected = []any{
+		map[string]any{
+			"keya": float64(123),
+			"keyb": float64(234),
+		},
+		map[string]any{
+			"keya": float64(123),
+			"keyb": float64(234),
+		},
+	}
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
+
+	data = `
+	{
+		"keyNum" : 123,
+		"keyNum2" : -123.234,
+		"keyStr": "hello world",
+		"keyBool": true,
+		"keyNull": null,
+		"keyArray": [1, 2, 3]
+	}`
+	expected = map[string]any{
+		"keyNum":   float64(123),
+		"keyNum2":  float64(-123.234),
+		"keyStr":   "hello world",
+		"keyBool":  true,
+		"keyNull":  nil,
+		"keyArray": []any{float64(1), float64(2), float64(3)},
+	}
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
+
+	data = `
+	{
+		"keyObject1":{
+			 "keyObject2":{
+					"key2":2
+			 }
+		}
+ }
+ `
+	expected = map[string]any{
+		"keyObject1": map[string]any{
+			"keyObject2": map[string]any{
+				"key2": float64(2),
+			},
+		},
+	}
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
+	}
 }
-func TestBasicInterfaceUnmarshal(t *testing.T) {
+func TestRFCExample(t *testing.T) {
 	objectData := `{
 		"Image": {
 				"Width":  800,

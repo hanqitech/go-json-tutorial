@@ -7,14 +7,18 @@ import (
 )
 
 func Unmarshal(data []byte, v any) error {
-	if json.Valid(data) {
+	if !json.Valid(data) {
 		return errors.New("invalid json")
 	}
+	p := newParser(data)
+	result := p.parse()
 
+	vptr := v.(*any)
+	*vptr = result
 	return nil
 }
 
-type tokenizer struct {
+type parser struct {
 	data []byte
 	len  int
 	// index 是指向当前字符串流的 char， endIndex 指向当前 token 结尾的 char
@@ -24,60 +28,60 @@ type tokenizer struct {
 	tokens []any
 }
 
-func newTokenizer(data []byte) *tokenizer {
-	p := new(tokenizer)
+func newParser(data []byte) *parser {
+	// fmt.Println(string(data))
+	p := new(parser)
 	p.data = data
 	p.len = len(data)
 	return p
 }
 
-func (t *tokenizer) curChar() rune {
+func (t *parser) curChar() rune {
 	return rune(t.data[t.index])
 }
 
-func (t *tokenizer) next() {
+func (t *parser) next() {
 	t.index += 1
 }
 
-func (t *tokenizer) end() bool {
+func (t *parser) end() bool {
 	return t.len <= t.index
 }
 
-func (t *tokenizer) isBlank() bool {
+func (t *parser) isBlank() bool {
 	switch t.curChar() {
-	case ' ', '\n', '\t', 'r':
+	case ' ', '\n', '\t', '\r':
 		return true
 	default:
 		return false
 	}
 }
 
-func (t *tokenizer) tryBool() bool {
+func (t *parser) tryBool() (any, bool) {
 	switch t.curChar() {
 	case 't':
-		t.tokens = append(t.tokens, true)
+		// t.tokens = append(t.tokens, true)
 		t.index += 4
-		return true
+		return true, true
 	case 'f':
 		t.tokens = append(t.tokens, false)
 		t.index += 5
-		return true
+		return false, true
 	default:
-		return false
+		return nil, false
 	}
 }
 
-func (t *tokenizer) tryString() bool {
+func (t *parser) tryString() (any, bool) {
+	var result any
 	switch t.curChar() {
 	case '"':
-		t.tokens = append(t.tokens, "\"")
 		next := t.index + 1
 		for {
 			if t.data[next] == '"' {
-				t.endIndex = next
-				t.tokens = append(t.tokens, string(t.data[t.index+1:t.endIndex]))
+				t.tokens = append(t.tokens, string(t.data[t.index+1:next]))
+				result = string(t.data[t.index+1 : next])
 				t.index = next + 1
-				t.tokens = append(t.tokens, "\"")
 				break
 			}
 			// 考虑 escape char
@@ -87,13 +91,13 @@ func (t *tokenizer) tryString() bool {
 			}
 			next += 1
 		}
-		return true
+		return result, true
 	default:
-		return false
+		return result, false
 	}
 }
 
-func (t *tokenizer) tryNum() bool {
+func (t *parser) tryNum() (any, bool) {
 	if (t.curChar() <= '9' && t.curChar() >= '0') || t.curChar() == '-' {
 		// 需要利用终止符寻找数字的结尾
 		next := t.index + 1
@@ -112,56 +116,70 @@ func (t *tokenizer) tryNum() bool {
 	FOR:
 
 		num, _ := strconv.ParseFloat(string(t.data[t.index:next]), 64)
-		t.tokens = append(t.tokens, num)
 		t.index = next
-		return true
+		return num, true
 	} else {
-		return false
+		return nil, false
 	}
 }
 
-func (t *tokenizer) tryNull() bool {
+func (t *parser) tryNull() (any, bool) {
 	switch t.curChar() {
 	case 'n':
-		t.tokens = append(t.tokens, nil)
 		t.index += 4
-		return true
+		return nil, true
 	default:
-		return false
+		return nil, false
 	}
 }
 
-func (t *tokenizer) tryPrimitive() bool {
-	return t.tryBool() || t.tryString() || t.tryNum() || t.tryNull()
+func (t *parser) tryPrimitive() (any, bool) {
+	var (
+		result any
+		ok     bool
+	)
+	if result, ok = t.tryBool(); ok {
+	} else if result, ok = t.tryNum(); ok {
+	} else if result, ok = t.tryString(); ok {
+	} else if result, ok = t.tryNull(); ok {
+	} else {
+		return nil, false
+	}
+	return result, true
 }
 
-func (t *tokenizer) tryComma() {
+func (t *parser) pass(input ...rune) {
 	for {
-		if t.isBlank() {
-			t.next()
-			continue
-		}
-
-		if t.curChar() == ']' {
+		if t.curChar() == ']' || t.curChar() == '}' {
 			return
 		}
 
-		if t.curChar() == ',' {
-			t.tokens = append(t.tokens, ",")
-			t.next()
-			return
+		for _, v := range input {
+			if t.curChar() == v {
+				t.next()
+				return
+			}
 		}
 	}
 }
 
-func (t *tokenizer) tryArray() bool {
+func (t *parser) passComma() {
+	t.passBlank()
+	t.pass(',')
+	t.passBlank()
+}
+
+func (t *parser) tryArray() (any, bool) {
+	var (
+		result []any
+		ok     bool
+		item   any
+	)
 	switch t.curChar() {
 	case '[':
-		t.tokens = append(t.tokens, "[")
 		t.next()
 		for {
 			if t.curChar() == ']' {
-				t.tokens = append(t.tokens, "]")
 				t.next()
 				break
 			}
@@ -169,23 +187,98 @@ func (t *tokenizer) tryArray() bool {
 				t.next()
 				continue
 			}
-
-			if t.tryPrimitive() {
-			} else if t.tryArray() {
+			if item, ok = t.tryPrimitive(); ok {
+			} else if item, ok = t.tryArray(); ok {
+			} else if item, ok = t.tryObject(); ok {
 			} else {
-				panic("array object not implemented")
+				panic("array invalid")
 			}
-			// 解析数据元素的分隔符
-			t.tryComma()
+			result = append(result, item)
+
+			// 跳过数据元素的分隔符
+			t.passComma()
 		}
-		return true
+		return result, true
 	default:
-		return false
+		return nil, false
 	}
 }
 
-func (t *tokenizer) parseTokens() error {
+func (t *parser) parseObjectKey() string {
+	item, _ := t.tryString()
+	return item.(string)
+}
+
+func (t *parser) passBlank() {
 	for {
+		if t.isBlank() {
+			t.next()
+			continue
+		} else {
+			return
+		}
+	}
+}
+
+func (t *parser) parseObjectValue() any {
+	var (
+		item any
+		ok   bool
+	)
+	if item, ok = t.tryPrimitive(); ok {
+	} else if item, ok = t.tryArray(); ok {
+	} else if item, ok = t.tryObject(); ok {
+	} else {
+		panic("object value invalid")
+	}
+	return item
+}
+
+func (t *parser) tryObject() (any, bool) {
+	var (
+		result map[string]any = map[string]any{}
+		// item   any
+		key   string
+		value any
+	)
+	switch t.curChar() {
+	case '{':
+		// 进入了 object 的内部
+		t.next()
+		for {
+			// fmt.Printf("try object [%c]\n", t.curChar())
+			if t.curChar() == '}' {
+				// 离开了 object
+				t.next()
+				break
+			}
+
+			t.passBlank()
+			key = t.parseObjectKey()
+			t.passBlank()
+			t.pass(':')
+
+			t.passBlank()
+			value = t.parseObjectValue()
+			result[key] = value
+			t.passBlank()
+			t.passComma()
+		}
+		return result, true
+	default:
+		return nil, false
+	}
+
+}
+
+func (t *parser) parse() any {
+	var (
+		// result any
+		ok   bool
+		item any
+	)
+	for {
+		// fmt.Printf("parse [%c]\n", t.curChar())
 		if t.end() {
 			break
 		}
@@ -194,25 +287,15 @@ func (t *tokenizer) parseTokens() error {
 			continue
 		}
 
-		if t.tryPrimitive() {
-			continue
-		} else if t.tryArray() {
-			continue
+		if item, ok = t.tryPrimitive(); ok {
+			return item
+		} else if item, ok = t.tryArray(); ok {
+			return item
+		} else if item, ok = t.tryObject(); ok {
+			return item
 		} else {
-			panic("not implemented")
-
+			panic("invalid")
 		}
-		// if t.tryBool() {
-		// 	continue
-		// } else if t.tryString() {
-		// 	continue
-		// } else if t.tryNum() {
-		// 	continue
-		// } else if t.tryNull() {
-		// 	continue
-		// } else{
-		// 	panic("not implemented")
-		// }
 
 	}
 
