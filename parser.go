@@ -45,7 +45,7 @@ func (t *tokenizer) end() bool {
 
 func (t *tokenizer) isBlank() bool {
 	switch t.curChar() {
-	case ' ', '\n', '\t':
+	case ' ', '\n', '\t', 'r':
 		return true
 	default:
 		return false
@@ -70,13 +70,14 @@ func (t *tokenizer) tryBool() bool {
 func (t *tokenizer) tryString() bool {
 	switch t.curChar() {
 	case '"':
+		t.tokens = append(t.tokens, "\"")
 		next := t.index + 1
 		for {
 			if t.data[next] == '"' {
-				// 注意需要去除首尾的 "
 				t.endIndex = next
 				t.tokens = append(t.tokens, string(t.data[t.index+1:t.endIndex]))
 				t.index = next + 1
+				t.tokens = append(t.tokens, "\"")
 				break
 			}
 			// 考虑 escape char
@@ -101,7 +102,7 @@ func (t *tokenizer) tryNum() bool {
 				break
 			}
 			switch t.data[next] {
-			case ',', ' ', '\t', '\n':
+			case ',', ' ', '\t', '\n', '\r', ']', '}':
 				// 可以 break 外层的 loop
 				goto FOR
 			default:
@@ -112,7 +113,7 @@ func (t *tokenizer) tryNum() bool {
 
 		num, _ := strconv.ParseFloat(string(t.data[t.index:next]), 64)
 		t.tokens = append(t.tokens, num)
-		t.index = next + 1
+		t.index = next
 		return true
 	} else {
 		return false
@@ -130,6 +131,58 @@ func (t *tokenizer) tryNull() bool {
 	}
 }
 
+func (t *tokenizer) tryPrimitive() bool {
+	return t.tryBool() || t.tryString() || t.tryNum() || t.tryNull()
+}
+
+func (t *tokenizer) tryComma() {
+	for {
+		if t.isBlank() {
+			t.next()
+			continue
+		}
+
+		if t.curChar() == ']' {
+			return
+		}
+
+		if t.curChar() == ',' {
+			t.tokens = append(t.tokens, ",")
+			t.next()
+			return
+		}
+	}
+}
+
+func (t *tokenizer) tryArray() bool {
+	switch t.curChar() {
+	case '[':
+		t.tokens = append(t.tokens, "[")
+		t.next()
+		for {
+			if t.curChar() == ']' {
+				t.tokens = append(t.tokens, "]")
+				t.next()
+				break
+			}
+			if t.isBlank() {
+				t.next()
+				continue
+			}
+
+			if t.tryPrimitive() {
+			} else if t.tryArray() {
+			} else {
+				panic("array object not implemented")
+			}
+			// 解析数据元素的分隔符
+			t.tryComma()
+		}
+		return true
+	default:
+		return false
+	}
+}
 
 func (t *tokenizer) parseTokens() error {
 	for {
@@ -141,17 +194,25 @@ func (t *tokenizer) parseTokens() error {
 			continue
 		}
 
-		if t.tryBool() {
+		if t.tryPrimitive() {
 			continue
-		} else if t.tryString() {
+		} else if t.tryArray() {
 			continue
-		} else if t.tryNum() {
-			continue
-		} else if t.tryNull() {
-			continue
-		} else{
+		} else {
 			panic("not implemented")
+
 		}
+		// if t.tryBool() {
+		// 	continue
+		// } else if t.tryString() {
+		// 	continue
+		// } else if t.tryNum() {
+		// 	continue
+		// } else if t.tryNull() {
+		// 	continue
+		// } else{
+		// 	panic("not implemented")
+		// }
 
 	}
 
