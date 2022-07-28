@@ -17,6 +17,7 @@ func TestParser(t *testing.T) {
 		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
 	}
 
+
 	data = `
 	false`
 	expected = false
@@ -27,8 +28,8 @@ func TestParser(t *testing.T) {
 		t.Fatalf("Unmarshal result %v, expected: %v", result, expected)
 	}
 
-	data = ` "Hello world!"	`
-	expected = "Hello world!"
+	data = ` "Hello world! 你好，世界！"	`
+	expected = "Hello world! 你好，世界！"
 	if err := Unmarshal([]byte(data), &result); err != nil {
 		t.Fatalf("str err %v", err)
 	}

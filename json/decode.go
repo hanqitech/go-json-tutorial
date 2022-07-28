@@ -288,6 +288,7 @@ func (d *decodeState) scanNext() {
 
 // scanWhile processes bytes in d.data[d.off:] until it
 // receives a scan code not equal to op.
+// 作用相当于我的 pass 函数，会修改 opCode 状态值，告知其他函数接下来应该做什么
 func (d *decodeState) scanWhile(op int) {
 	s, data, i := &d.scan, d.data, d.off
 	for i < len(data) {
@@ -312,6 +313,9 @@ func (d *decodeState) scanWhile(op int) {
 // Only in the second step do we use decodeState to tokenize literals, so we
 // know there aren't any syntax errors. We can take advantage of that knowledge,
 // and scan a literal's bytes much more quickly.
+// 修改 off ，使其指向这个基本值的结尾的下一个 char
+// 这样外部基于之前的 off 就能拿到这个 primitive token
+//
 func (d *decodeState) rescanLiteral() {
 	data, i := d.data, d.off
 Switch:
@@ -354,6 +358,7 @@ Switch:
 // reads the following byte ahead. If v is invalid, the value is discarded.
 // The first byte of the value has been read already.
 func (d *decodeState) value(v reflect.Value) error {
+	// fmt.Printf("value opCode: [%d]\n", d.opcode)
 	switch d.opcode {
 	default:
 		panic(phasePanicMsg)
@@ -366,6 +371,7 @@ func (d *decodeState) value(v reflect.Value) error {
 		} else {
 			d.skip()
 		}
+		// fmt.Printf("value after array: [%+v]\n", v.Elem())
 		d.scanNext()
 
 	case scanBeginObject:
@@ -382,7 +388,7 @@ func (d *decodeState) value(v reflect.Value) error {
 		// All bytes inside literal return scanContinue op code.
 		start := d.readIndex()
 		d.rescanLiteral()
-
+		// fmt.Printf("literal value after scan: #%c#\n", d.data[start:d.readIndex()])
 		if v.IsValid() {
 			if err := d.literalStore(d.data[start:d.readIndex()], v, false); err != nil {
 				return err
@@ -513,11 +519,13 @@ func (d *decodeState) array(v reflect.Value) error {
 	v = pv
 
 	// Check type of target.
+	// fmt.Printf("decodeState array v.Kind() [%+v]\n", v.Kind())
 	switch v.Kind() {
 	case reflect.Interface:
 		if v.NumMethod() == 0 {
 			// Decoding into nil interface? Switch to non-reflect code.
 			ai := d.arrayInterface()
+			fmt.Printf("decodeState after arrayInterface [%+v]\n", ai)
 			v.Set(reflect.ValueOf(ai))
 			return nil
 		}

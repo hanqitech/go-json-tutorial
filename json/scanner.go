@@ -194,6 +194,7 @@ func (s *scanner) popParseState() {
 	}
 }
 
+// 为什么会有 <= 这个逻辑？
 func isSpace(c byte) bool {
 	return c <= ' ' && (c == ' ' || c == '\t' || c == '\r' || c == '\n')
 }
@@ -274,6 +275,7 @@ func stateBeginString(s *scanner, c byte) int {
 
 // stateEndValue is the state after completing a value,
 // such as after reading `{}` or `true` or `["x"`.
+// 解析完一个 value 之后，根据下一个 char 返回相应的 opCode
 func stateEndValue(s *scanner, c byte) int {
 	n := len(s.parseState)
 	if n == 0 {

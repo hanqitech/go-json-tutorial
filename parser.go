@@ -21,11 +21,8 @@ func Unmarshal(data []byte, v any) error {
 type parser struct {
 	data []byte
 	len  int
-	// index 是指向当前字符串流的 char， endIndex 指向当前 token 结尾的 char
-	index    int
-	endIndex int
-
-	tokens []any
+	// index 指向当前字符串流的 char
+	index int
 }
 
 func newParser(data []byte) *parser {
@@ -60,11 +57,9 @@ func (t *parser) isBlank() bool {
 func (t *parser) tryBool() (any, bool) {
 	switch t.curChar() {
 	case 't':
-		// t.tokens = append(t.tokens, true)
 		t.index += 4
 		return true, true
 	case 'f':
-		t.tokens = append(t.tokens, false)
 		t.index += 5
 		return false, true
 	default:
@@ -79,7 +74,6 @@ func (t *parser) tryString() (any, bool) {
 		next := t.index + 1
 		for {
 			if t.data[next] == '"' {
-				t.tokens = append(t.tokens, string(t.data[t.index+1:next]))
 				result = string(t.data[t.index+1 : next])
 				t.index = next + 1
 				break
@@ -195,7 +189,7 @@ func (t *parser) tryArray() (any, bool) {
 			}
 			result = append(result, item)
 
-			// 跳过数据元素的分隔符
+			// 跳过数组元素的分隔符
 			t.passComma()
 		}
 		return result, true
@@ -273,7 +267,6 @@ func (t *parser) tryObject() (any, bool) {
 
 func (t *parser) parse() any {
 	var (
-		// result any
 		ok   bool
 		item any
 	)

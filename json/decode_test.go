@@ -1467,6 +1467,9 @@ func TestUnmarshal(t *testing.T) {
 	}
 }
 
+// 随机生成的大 json 的测试，充分利用 Marshal，不用手写 json
+// 应该多跑几次
+// 集成测试
 func TestUnmarshalMarshal(t *testing.T) {
 	initBig()
 	var v any
@@ -2864,4 +2867,104 @@ func TestUnmarshalMaxDepth(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestForRead(t *testing.T) {
+	// 	data := `
+	// 	[
+	//    {
+	//       "keya":123,
+	//       "keyb":234
+	//    }
+	// ]
+	// `
+	// 	expected := []any{
+	// 		map[string]any{
+	// 			"keya": float64(123),
+	// 			"keyb": float64(234),
+	// 		},
+	// 	}
+	// 	var result any
+	// 	if err := Unmarshal([]byte(data), &result); err != nil {
+	// 		t.Fatalf("object err %v", err)
+	// 	}
+	data := `[1, 2, 3]`
+	// expected := true
+	var result any
+	if err := Unmarshal([]byte(data), &result); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+
+}
+
+func TestApi(t *testing.T) {
+	// 1. 第一种 API， 将 JSON 转化为 Golang 具体的类型，比如 number 》float64、int64 等等，true 》 bool
+	data := `null`
+	var resultNil any
+	if err := Unmarshal([]byte(data), &resultNil); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+	fmt.Printf("null result : [%v]\n", resultNil)
+
+	dataNum := `123`
+	var resultNum int64
+	if err := Unmarshal([]byte(dataNum), &resultNum); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+	fmt.Printf("null result : [%v]\n", resultNum)
+
+	data = `true`
+	var resultB bool
+	if err := Unmarshal([]byte(data), &resultB); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+	fmt.Printf("bool result : [%v]\n", resultB)
+
+	data = `[1, 2, 3]`
+	var resultSlice []int64
+	if err := Unmarshal([]byte(data), &resultSlice); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+	fmt.Printf("slice result : [%v]\n", resultSlice)
+
+	data = `[1, 2, 3]`
+	var resultArray [3]int64
+	if err := Unmarshal([]byte(data), &resultArray); err != nil {
+		t.Fatalf("object err %v", err)
+	}
+	fmt.Printf("slice result : [%v]\n", resultArray)
+}
+
+func TestRune(t *testing.T) {
+	// var a rune
+	// var b byte
+	data := "你好世界"
+	for _, v := range data {
+		fmt.Printf("%c\n", v)
+		r := string(v)
+		fmt.Println(r)
+	}
+}
+
+func TestDeepPtr(t *testing.T) {
+	var xint int
+	ptr1 := &xint
+	ptr2 := &ptr1
+	ptr3 := ptr2
+	data := "123"
+	err := Unmarshal([]byte(data), ptr3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("%d", **(ptr3))
+}
+
+func TestStateTransition(t *testing.T) {
+	var result any
+	data := `[1, 2, {"test": 3}]`
+	err := Unmarshal([]byte(data), &result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("%+v", result)
 }
